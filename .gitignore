@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# The robot/ subproject has its own .gitignore for Gradle build output.

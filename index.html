@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FRC 6560 — Power & Electrical Monitor</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="team">6560</span>
+      <div class="brand-text">
+        <h1>Power &amp; Electrical Systems Monitor</h1>
+        <p>Live PDH draw · brownout guard · priority load-shedding — <em>simulation demo</em></p>
+      </div>
+    </div>
+    <div class="match">
+      <div class="clock" id="clock">0:00</div>
+      <div class="match-controls">
+        <button id="btn-start" class="btn btn-primary">Start</button>
+        <button id="btn-reset" class="btn">Reset</button>
+      </div>
+      <div class="status-pill" id="status-pill">GREEN</div>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- Battery / voltage -->
+    <section class="panel span-6">
+      <div class="panel-head"><h2>Bus Voltage</h2><span class="hint">brownout &lt; 6.8 V</span></div>
+      <div class="big-readout">
+        <span class="value" id="voltage-value">12.0</span><span class="unit">V</span>
+        <div class="sub">
+          <span>min <b id="min-voltage">12.0</b> V</span>
+          <span>SoC <b id="soc">100</b>%</span>
+        </div>
+      </div>
+      <canvas id="graph" height="150"></canvas>
+      <div class="legend">
+        <span class="lg lg-v">Bus voltage</span>
+        <span class="lg lg-a">Total current</span>
+        <span class="lg lg-budget">90 A budget</span>
+        <span class="lg lg-finance">finance budget</span>
+      </div>
+    </section>
+
+    <!-- Total current + stat tiles -->
+    <section class="panel span-6">
+      <div class="panel-head"><h2>Total Current</h2><span class="hint">budget 90 A · main breaker 120 A</span></div>
+      <div class="big-readout">
+        <span class="value" id="current-value">0</span><span class="unit">A</span>
+      </div>
+      <div class="meter" id="current-meter">
+        <div class="meter-fill" id="current-fill"></div>
+        <div class="mark mark-caution" style="left:58.3%"><span>70</span></div>
+        <div class="mark mark-budget" style="left:75%"><span>90</span></div>
+        <div class="mark mark-breaker" style="left:100%"><span>120</span></div>
+      </div>
+      <div class="tiles">
+        <div class="tile"><span class="tile-label">Brownouts</span><span class="tile-value bad" id="brownouts">0</span></div>
+        <div class="tile"><span class="tile-label">Energy</span><span class="tile-value" id="energy">0.0 Wh</span></div>
+        <div class="tile"><span class="tile-label">Load Shedding</span><span class="tile-value" id="shed-status">nominal</span></div>
+      </div>
+    </section>
+
+    <!-- Battery estimator + finance department -->
+    <section class="panel span-8 estimator">
+      <div class="panel-head"><h2>Battery Estimator &amp; Finance Department</h2><span class="hint">Thevenin SOC · breaker thermal · dynamic current allocation</span></div>
+      <div class="est-grid">
+        <div class="est-block">
+          <div class="est-label">State of Charge</div>
+          <div class="gauge"><div class="gauge-fill" id="soc-fill"></div><span class="gauge-text" id="soc-text">100%</span></div>
+          <div class="est-row"><span>OCV est.</span><b id="ocv-val" class="mono">12.9 V</b></div>
+          <div class="est-row"><span>Series R₀</span><b id="r0-val" class="mono">0.012 Ω</b></div>
+          <div class="est-row"><span>Predicted V</span><b id="predv-val" class="mono">12.9 V</b></div>
+          <div class="est-row"><span>Measured V</span><b id="measv-val" class="mono">12.9 V</b></div>
+        </div>
+        <div class="est-block">
+          <div class="est-label">Main Breaker Thermal <span class="hint">trip at 100%</span></div>
+          <div class="gauge"><div class="gauge-fill thermal" id="thermal-fill"></div><span class="gauge-text" id="thermal-text">0%</span></div>
+          <div class="est-label" style="margin-top:14px">Finance Department</div>
+          <div class="est-row big"><span>Permissible total</span><b id="permissible-val" class="mono accent">120 A</b></div>
+          <div class="est-row big"><span>→ Drive allocation</span><b id="drivealloc-val" class="mono accent">120 A</b></div>
+          <label class="switch-label" style="margin-top:10px">
+            <input type="checkbox" id="toggle-finance" checked />
+            <span>Finance dept. allocates drive current</span>
+          </label>
+        </div>
+        <div class="est-block">
+          <div class="est-label">Match Energy Usage</div>
+          <canvas id="energy-pie" width="150" height="150"></canvas>
+          <div class="est-row"><span>Total</span><b id="energy-total" class="mono">0.0 Wh</b></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Per-subsystem bars -->
+    <section class="panel span-8">
+      <div class="panel-head"><h2>Per-Subsystem Draw</h2><span class="hint">bar scaled to channel breaker · ▸ = smart current limit</span></div>
+      <div class="subsystems" id="subsystems"></div>
+    </section>
+
+    <!-- Alerts -->
+    <section class="panel span-4">
+      <div class="panel-head"><h2>Driver-Station Alerts</h2><button class="btn btn-small" id="btn-clear-alerts">clear</button></div>
+      <ul class="alerts" id="alerts"></ul>
+    </section>
+
+    <!-- Controls -->
+    <section class="panel span-12">
+      <div class="panel-head"><h2>Driver Controls</h2><span class="hint">drag to demand current from each subsystem</span></div>
+      <div class="controls" id="controls"></div>
+      <div class="control-row">
+        <button class="btn btn-danger" id="btn-stress">⚡ Worst-case test (drive + shoot + intake + climb)</button>
+        <label class="switch-label">
+          <input type="checkbox" id="toggle-shed" checked />
+          <span>Automatic load-shedding</span>
+        </label>
+        <label class="slider-label">
+          Battery age
+          <input type="range" id="battery-age" min="0" max="100" value="30" />
+          <span id="battery-age-val" class="mono">0.30</span>
+        </label>
+        <button class="btn" id="btn-export">Export match log (CSV)</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Demo of the Team 6560 Power Draw &amp; Electrical Systems Monitor design doc. Values are simulated, not from a real PDH.
+  </footer>
+
+  <script src="js/constants.js"></script>
+  <script src="js/loadShedder.js"></script>
+  <script src="js/batteryEstimator.js"></script>
+  <script src="js/breakerModel.js"></script>
+  <script src="js/finance.js"></script>
+  <script src="js/simulation.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

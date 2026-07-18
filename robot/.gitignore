@@ -1,0 +1,22 @@
+# Gradle / build
+.gradle/
+build/
+bin/
+!**/src/**/bin/
+
+# WPILib / GradleRIO
+.wpilib/*.local
+ctre_sim/
+logs/
+*.hex
+
+# IDE
+.idea/
+*.iml
+.vscode/settings.json
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
