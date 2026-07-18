@@ -57,17 +57,16 @@
         <div class="mark mark-budget" style="left:75%"><span>90</span></div>
         <div class="mark mark-breaker" style="left:100%"><span>120</span></div>
       </div>
-      <div class="tiles">
+      <div class="tiles tiles-2">
         <div class="tile"><span class="tile-label">Brownouts</span><span class="tile-value bad" id="brownouts">0</span></div>
-        <div class="tile"><span class="tile-label">Energy</span><span class="tile-value" id="energy">0.0 Wh</span></div>
-        <div class="tile"><span class="tile-label">Load Shedding</span><span class="tile-value" id="shed-status">nominal</span></div>
+        <div class="tile"><span class="tile-label">Peak Current</span><span class="tile-value" id="peak-current">0 A</span></div>
       </div>
     </section>
 
     <!-- Battery estimator + finance department -->
     <section class="panel span-8 estimator">
       <div class="panel-head"><h2>Battery Estimator &amp; Finance Department</h2><span class="hint">Thevenin SOC · breaker thermal · dynamic current allocation</span></div>
-      <div class="est-grid">
+      <div class="est-grid est-grid-2">
         <div class="est-block">
           <div class="est-label">State of Charge</div>
           <div class="gauge"><div class="gauge-fill" id="soc-fill"></div><span class="gauge-text" id="soc-text">100%</span></div>
@@ -87,10 +86,32 @@
             <span>Finance dept. allocates drive current</span>
           </label>
         </div>
-        <div class="est-block">
-          <div class="est-label">Match Energy Usage</div>
-          <canvas id="energy-pie" width="150" height="150"></canvas>
-          <div class="est-row"><span>Total</span><b id="energy-total" class="mono">0.0 Wh</b></div>
+      </div>
+    </section>
+
+    <!-- Match timeline + subsystem breakdown pie -->
+    <section class="panel span-12">
+      <div class="panel-head">
+        <h2>Match Timeline — Current &amp; Brownouts</h2>
+        <span class="hint">hover the graph to inspect a moment · red bands = brownouts</span>
+      </div>
+      <div class="timeline-wrap">
+        <div class="timeline-graph">
+          <canvas id="timeline" height="220"></canvas>
+          <div class="legend">
+            <span class="lg lg-a">Total current</span>
+            <span class="lg lg-v">Bus voltage</span>
+            <span class="lg lg-budget">90 A budget</span>
+            <span class="lg lg-brown">brownout</span>
+          </div>
+        </div>
+        <div class="timeline-side">
+          <div class="scrub-readout">
+            <span class="scrub-when" id="scrub-when">live</span>
+            <span class="scrub-total"><b id="scrub-total">0</b> A total</span>
+          </div>
+          <canvas id="breakdown-pie" width="180" height="180"></canvas>
+          <ul class="pie-legend" id="pie-legend"></ul>
         </div>
       </div>
     </section>

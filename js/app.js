@@ -23,16 +23,23 @@
     clock: $('clock'), statusPill: $('status-pill'),
     voltage: $('voltage-value'), minVoltage: $('min-voltage'), soc: $('soc'),
     current: $('current-value'), currentFill: $('current-fill'),
-    brownouts: $('brownouts'), energy: $('energy'), shedStatus: $('shed-status'),
+    brownouts: $('brownouts'), peakCurrent: $('peak-current'),
     subsystems: $('subsystems'), alerts: $('alerts'), controls: $('controls'),
     graph: $('graph'),
     socFill: $('soc-fill'), socText: $('soc-text'), ocv: $('ocv-val'), r0: $('r0-val'),
     predv: $('predv-val'), measv: $('measv-val'),
     thermalFill: $('thermal-fill'), thermalText: $('thermal-text'),
     permissible: $('permissible-val'), drivealloc: $('drivealloc-val'),
-    energyPie: $('energy-pie'), energyTotal: $('energy-total'),
+    timeline: $('timeline'), breakdownPie: $('breakdown-pie'), pieLegend: $('pie-legend'),
+    scrubWhen: $('scrub-when'), scrubTotal: $('scrub-total'),
   };
   initModels();
+
+  // Per-subsystem colors for the breakdown pie + legend.
+  const SUB_COLORS = {
+    drivetrain: '#4d7ab8', shooter: '#f2b705', intake: '#2ea043',
+    climber: '#c9518a', indexer: '#8b5cf6', turret: '#e07a3f',
+  };
 
   // ---- Build per-subsystem bars + controls ----
   const subEls = {};
@@ -84,7 +91,8 @@
       subEls[s.key].slider.value = 0;
       subEls[s.key].readout.textContent = '0%';
     }
-    logRows.length = 0; history.length = 0;
+    logRows.length = 0; history.length = 0; matchHistory.length = 0;
+    peakCurrent = 0; scrubIndex = null;
     el.alerts.innerHTML = '<li class="empty">No alerts.</li>';
   });
 
@@ -133,10 +141,15 @@
   }
 
   // ---- History for graph + CSV log ----
-  const history = [];      // {v, a} recent points for the graph
+  const history = [];      // {v, a} recent points for the rolling live graph
   const MAX_POINTS = 300;
   const logRows = [];      // full match log for CSV export
   let logDecim = 0;
+
+  // ---- Full-match history for the timeline + scrubbable breakdown pie ----
+  const matchHistory = [];   // {t, v, a, brown, subs:{key:amps}} for the whole match
+  let peakCurrent = 0;
+  let scrubIndex = null;     // hovered sample index, or null = live (latest)
 
   // ---- Main loop @ 50 Hz ----
   setInterval(tick, PM.LOOP_MS);
@@ -190,12 +203,8 @@
     // Tiles.
     el.brownouts.textContent = r.brownoutCount;
     el.brownouts.className = 'tile-value bad' + (r.brownoutCount > 0 ? ' hit' : '');
-    el.energy.textContent = (r.energyJoules / 3600).toFixed(1) + ' Wh';
-    const shedList = [...shedder.shed];
-    el.shedStatus.textContent = shedList.length
-      ? shedList.map((k) => PM.SUBSYSTEMS.find((s) => s.key === k).label).join(', ')
-      : 'nominal';
-    el.shedStatus.className = 'tile-value' + (shedList.length ? ' shedding' : '');
+    el.peakCurrent.textContent = Math.round(peakCurrent) + ' A';
+    el.peakCurrent.className = 'tile-value ' + currentClass(peakCurrent);
 
     // Per-subsystem bars.
     for (const s of PM.SUBSYSTEMS) {
@@ -228,31 +237,124 @@
 
     el.permissible.textContent = finance.enabled ? Math.round(finance.permissibleTotal) + ' A' : '—';
     el.drivealloc.textContent = finance.enabled ? Math.round(finance.driveAllocation) + ' A' : 'static 240 A';
-
-    el.energyTotal.textContent = (r.energyJoules / 3600).toFixed(1) + ' Wh';
-    drawEnergyPie();
   }
 
-  // Match-energy pie (mirrors the binder's "Typical Match Energy Usage").
-  const pieCtx = el.energyPie.getContext('2d');
-  const PIE_COLORS = ['#4d7ab8', '#8fb3de', '#1f3d6e', '#2f5c9e', '#6b95c9', '#0b1f3f', '#111827'];
-  function drawEnergyPie() {
-    const parts = [...PM.SUBSYSTEMS.map((s) => ({ label: s.label, wh: sim.energyWh[s.key] })),
-                   { label: 'Other', wh: sim.energyWh.other }];
-    const total = parts.reduce((a, p) => a + p.wh, 0) || 1;
-    const cx = 75, cy = 75, rad = 62;
-    pieCtx.clearRect(0, 0, 150, 150);
-    let ang = -Math.PI / 2;
-    parts.forEach((p, i) => {
-      const slice = (p.wh / total) * Math.PI * 2;
-      pieCtx.beginPath(); pieCtx.moveTo(cx, cy);
-      pieCtx.arc(cx, cy, rad, ang, ang + slice);
-      pieCtx.closePath();
-      pieCtx.fillStyle = PIE_COLORS[i % PIE_COLORS.length];
-      pieCtx.fill();
-      ang += slice;
+  // ---- Match timeline (full-match current + brownouts, hover to scrub) ----
+  const tlCtx = el.timeline.getContext('2d');
+  const pieCtx = el.breakdownPie.getContext('2d');
+  const TL_MAX_A = 260;   // current axis top (covers inrush spikes)
+  const TL_MAX_V = 13;
+
+  function timeSpanMs() { return Math.max(matchTimeMs, 30000); } // grow window, min 30 s
+
+  function drawTimeline() {
+    const w = el.timeline.width = el.timeline.clientWidth;
+    const h = el.timeline.height;
+    tlCtx.clearRect(0, 0, w, h);
+    const span = timeSpanMs();
+
+    // gridlines + current axis labels
+    tlCtx.fillStyle = '#5f6b7a'; tlCtx.font = '10px ui-monospace, monospace';
+    tlCtx.strokeStyle = 'rgba(255,255,255,0.05)'; tlCtx.lineWidth = 1;
+    [0, 60, 120, 180, 240].forEach((a) => {
+      const y = h - (a / TL_MAX_A) * h;
+      tlCtx.beginPath(); tlCtx.moveTo(30, y); tlCtx.lineTo(w, y); tlCtx.stroke();
+      tlCtx.fillText(a + 'A', 2, y + 3);
     });
+
+    if (matchHistory.length < 2) return;
+    const xOf = (t) => 30 + (t / span) * (w - 30);
+
+    // brownout bands (red verticals)
+    tlCtx.fillStyle = 'rgba(248,81,73,0.22)';
+    for (const p of matchHistory) if (p.brown) tlCtx.fillRect(xOf(p.t), 0, Math.max(1, (w - 30) / span * PM.LOOP_MS), h);
+
+    // 90A budget line
+    tlCtx.strokeStyle = 'rgba(248,81,73,0.45)'; tlCtx.setLineDash([4, 4]);
+    const yB = h - (PM.Budget.TOTAL_CURRENT_BUDGET_AMPS / TL_MAX_A) * h;
+    tlCtx.beginPath(); tlCtx.moveTo(30, yB); tlCtx.lineTo(w, yB); tlCtx.stroke();
+    tlCtx.setLineDash([]);
+
+    // bus voltage (faint blue, its own scale)
+    tlCtx.strokeStyle = 'rgba(88,166,255,0.5)'; tlCtx.lineWidth = 1;
+    tlCtx.beginPath();
+    matchHistory.forEach((p, i) => { const x = xOf(p.t), y = h - (Math.min(TL_MAX_V, p.v) / TL_MAX_V) * h; i ? tlCtx.lineTo(x, y) : tlCtx.moveTo(x, y); });
+    tlCtx.stroke();
+
+    // total current (gold, prominent)
+    tlCtx.strokeStyle = '#f2b705'; tlCtx.lineWidth = 1.6;
+    tlCtx.beginPath();
+    matchHistory.forEach((p, i) => { const x = xOf(p.t), y = h - (Math.min(TL_MAX_A, p.a) / TL_MAX_A) * h; i ? tlCtx.lineTo(x, y) : tlCtx.moveTo(x, y); });
+    tlCtx.stroke();
+
+    // scrub cursor
+    const idx = activeIndex();
+    if (idx != null && matchHistory[idx]) {
+      const x = xOf(matchHistory[idx].t);
+      tlCtx.strokeStyle = '#e6edf3'; tlCtx.lineWidth = 1;
+      tlCtx.beginPath(); tlCtx.moveTo(x, 0); tlCtx.lineTo(x, h); tlCtx.stroke();
+    }
   }
+
+  function activeIndex() {
+    if (scrubIndex != null && scrubIndex < matchHistory.length) return scrubIndex;
+    return matchHistory.length ? matchHistory.length - 1 : null;
+  }
+
+  function drawBreakdown() {
+    const idx = activeIndex();
+    const sample = idx != null ? matchHistory[idx] : null;
+    const cx = 90, cy = 90, rad = 74;
+    pieCtx.clearRect(0, 0, 180, 180);
+
+    const parts = PM.SUBSYSTEMS.map((s) => ({ key: s.key, label: s.label, a: sample ? sample.subs[s.key] : 0 }));
+    const total = parts.reduce((sum, p) => sum + p.a, 0);
+
+    // scrub readout
+    if (sample) {
+      el.scrubWhen.textContent = (scrubIndex != null ? '' : 'live · ') + fmtClock(sample.t);
+      el.scrubTotal.textContent = Math.round(sample.a);
+    } else {
+      el.scrubWhen.textContent = 'live'; el.scrubTotal.textContent = 0;
+    }
+
+    if (total < 0.5) {
+      pieCtx.strokeStyle = '#2a3240'; pieCtx.lineWidth = 2;
+      pieCtx.beginPath(); pieCtx.arc(cx, cy, rad, 0, Math.PI * 2); pieCtx.stroke();
+    } else {
+      let ang = -Math.PI / 2;
+      for (const p of parts) {
+        if (p.a <= 0) continue;
+        const slice = (p.a / total) * Math.PI * 2;
+        pieCtx.beginPath(); pieCtx.moveTo(cx, cy);
+        pieCtx.arc(cx, cy, rad, ang, ang + slice); pieCtx.closePath();
+        pieCtx.fillStyle = SUB_COLORS[p.key]; pieCtx.fill();
+        ang += slice;
+      }
+    }
+
+    // legend
+    el.pieLegend.innerHTML = parts
+      .map((p) => `<li><span class="sw" style="background:${SUB_COLORS[p.key]}"></span>` +
+        `<span class="nm">${p.label}</span>` +
+        `<span class="amp">${p.a.toFixed(1)} A</span>` +
+        `<span class="pct">${total > 0.5 ? Math.round((p.a / total) * 100) : 0}%</span></li>`)
+      .join('');
+  }
+
+  // Hover the timeline to scrub; leave to return to live.
+  el.timeline.addEventListener('mousemove', (e) => {
+    if (matchHistory.length < 2) return;
+    const rect = el.timeline.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const frac = Math.max(0, Math.min(1, (x - 30) / (rect.width - 30)));
+    const t = frac * timeSpanMs();
+    // nearest sample by time
+    let lo = 0, hi = matchHistory.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (matchHistory[mid].t < t) lo = mid + 1; else hi = mid; }
+    scrubIndex = lo;
+  });
+  el.timeline.addEventListener('mouseleave', () => { scrubIndex = null; });
 
   function runAlerts(r) {
     if (r.brownedOut) alert('brownout', `BROWNOUT #${r.brownoutCount} — bus ${r.busVoltage.toFixed(1)} V`, 'error');
@@ -276,6 +378,17 @@
     history.push({ v: r.busVoltage, a: r.totalCurrent });
     if (history.length > MAX_POINTS) history.shift();
     drawGraph();
+
+    // Full-match timeline sample (only while the match is running).
+    if (running) {
+      if (r.totalCurrent > peakCurrent) peakCurrent = r.totalCurrent;
+      const subs = {};
+      for (const s of PM.SUBSYSTEMS) subs[s.key] = sim.subsystemCurrent(s.key);
+      matchHistory.push({ t: matchTimeMs, v: r.busVoltage, a: r.totalCurrent, brown: r.brownedOut, subs });
+    }
+    drawTimeline();
+    drawBreakdown();
+
     if (running && (logDecim++ % 5 === 0)) { // ~10 Hz log
       const row = [(matchTimeMs / 1000).toFixed(2), r.busVoltage.toFixed(2), r.totalCurrent.toFixed(1)];
       for (const s of PM.SUBSYSTEMS) row.push(sim.subsystemCurrent(s.key).toFixed(1));

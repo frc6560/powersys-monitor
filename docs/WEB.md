@@ -49,7 +49,17 @@ the simulated battery:
 - **Battery age** slider raises internal resistance, so the same draw sags harder — mirrors the
   §6 idea of correlating battery age with voltage sag.
 - **Export match log (CSV)** downloads the recorded log (time, bus V, total A, per-subsystem A,
-  brownout flag) — the demo stand-in for the on-robot DataLog (§4.2).
+  SOC, breaker thermal, permissible/allocated current, brownout flag) — the demo stand-in for
+  the on-robot DataLog (§4.2).
+
+## Match timeline & subsystem breakdown
+
+The **Match Timeline** panel records total current (gold) and bus voltage (blue) across the whole
+match, with **red bands marking brownouts** so you can spot exactly where the bus sagged. **Hover
+the graph** to scrub to any moment — a cursor appears and the **breakdown pie** to the right shows
+each subsystem's current draw (amps + %) at that timestamp. Move off the graph to return to the
+live value. Handy for post-match review: find a brownout spike, then read which subsystems were
+pulling current at that instant.
 
 ## How it maps to the design doc
 
