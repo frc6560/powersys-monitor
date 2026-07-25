@@ -3,16 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FRC 6560 — Power & Electrical Monitor</title>
+  <title>Charging Champions · 6560 — Power Systems Monitor</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="team">6560</span>
+      <span class="logo" aria-label="Charging Champions logo">
+        <svg viewBox="0 0 48 64" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="ccbolt" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#00baff"/>
+              <stop offset="1" stop-color="#1179ee"/>
+            </linearGradient>
+          </defs>
+          <path d="M30 2 L6 34 H19 L15 44 L42 20 H27 L34 2 Z"
+                fill="none" stroke="#33becc" stroke-width="3.2"
+                stroke-linejoin="round" stroke-linecap="round" opacity="0.55"
+                transform="translate(-3 4)"/>
+          <path d="M30 2 L6 34 H19 L15 44 L42 20 H27 L34 2 Z"
+                fill="url(#ccbolt)" stroke="url(#ccbolt)" stroke-width="2"
+                stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+      </span>
       <div class="brand-text">
         <h1>Power &amp; Electrical Systems Monitor</h1>
-        <p>Live PDH draw · brownout guard · priority load-shedding — <em>simulation demo</em></p>
+        <p><span class="cc">Charging Champions</span> · Team 6560 · brownout guard · load-shedding — <em>simulation demo</em></p>
       </div>
     </div>
     <div class="toolbar">
@@ -145,7 +161,7 @@
   </main>
 
   <footer class="footer">
-    Demo of the Team 6560 Power Draw &amp; Electrical Systems Monitor design doc. Values are simulated, not from a real PDH.
+    <span class="cc">Charging Champions</span> · FRC Team 6560 — Power Draw &amp; Electrical Systems Monitor. Values are simulated, not from a real PDH.
   </footer>
 
   <script src="js/constants.js"></script>

@@ -36,9 +36,11 @@
   initModels();
 
   // Per-subsystem colors for the breakdown pie + legend.
+  // Categorical palette for the breakdown pie: brand blues lead, with distinct
+  // supporting hues so six subsystems stay distinguishable.
   const SUB_COLORS = {
-    drivetrain: '#4d7ab8', shooter: '#f2b705', intake: '#2ea043',
-    climber: '#c9518a', indexer: '#8b5cf6', turret: '#e07a3f',
+    drivetrain: '#1179ee', shooter: '#00baff', intake: '#33becc',
+    climber: '#f5b13d', indexer: '#a06bff', turret: '#ff6b8a',
   };
 
   // ---- Build per-subsystem bars ----
@@ -277,13 +279,13 @@
     tlCtx.setLineDash([]);
 
     // bus voltage (faint blue, its own scale)
-    tlCtx.strokeStyle = 'rgba(88,166,255,0.5)'; tlCtx.lineWidth = 1;
+    tlCtx.strokeStyle = 'rgba(17,121,238,0.65)'; tlCtx.lineWidth = 1;
     tlCtx.beginPath();
     matchHistory.forEach((p, i) => { const x = xOf(p.t), y = h - (Math.min(TL_MAX_V, p.v) / TL_MAX_V) * h; i ? tlCtx.lineTo(x, y) : tlCtx.moveTo(x, y); });
     tlCtx.stroke();
 
     // total current (gold, prominent)
-    tlCtx.strokeStyle = '#f2b705'; tlCtx.lineWidth = 1.6;
+    tlCtx.strokeStyle = '#00baff'; tlCtx.lineWidth = 1.6;
     tlCtx.beginPath();
     matchHistory.forEach((p, i) => { const x = xOf(p.t), y = h - (Math.min(TL_MAX_A, p.a) / TL_MAX_A) * h; i ? tlCtx.lineTo(x, y) : tlCtx.moveTo(x, y); });
     tlCtx.stroke();
@@ -428,7 +430,7 @@
     const x0 = w - (history.length - 1) * stepX;
 
     // current (gold)
-    ctx.strokeStyle = '#f2b705'; ctx.lineWidth = 1.5; ctx.beginPath();
+    ctx.strokeStyle = '#00baff'; ctx.lineWidth = 1.5; ctx.beginPath();
     history.forEach((p, i) => {
       const x = x0 + i * stepX, y = h - Math.min(1, p.a / 120) * h;
       i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
@@ -436,7 +438,7 @@
     ctx.stroke();
 
     // voltage (blue)
-    ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.strokeStyle = '#1179ee'; ctx.lineWidth = 2; ctx.beginPath();
     history.forEach((p, i) => {
       const x = x0 + i * stepX, y = h - Math.min(1, p.v / 13) * h;
       i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);

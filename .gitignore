@@ -6,3 +6,4 @@
 .idea/
 
 # The robot/ subproject has its own .gitignore for Gradle build output.
+brand-guide.pdf

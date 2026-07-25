@@ -1,16 +1,33 @@
+/* Chalet Comprime is a licensed font — load it from the viewer's machine if present
+   (Charging Champions members' Macs), otherwise fall back gracefully. */
+@font-face {
+  font-family: "Chalet Comprime";
+  src: local("Chalet Comprime Eighty"), local("ChaletComprime-Eighty"),
+       local("Chalet Comprime Cologne Eighty"), local("Chalet Comprime");
+  font-display: swap;
+}
+
 :root {
-  --bg: #0d1117;
-  --panel: #161b22;
-  --panel-2: #1c2230;
-  --border: #2a3240;
-  --text: #e6edf3;
-  --muted: #8b949e;
-  --accent: #f2b705;      /* team-ish gold */
-  --green: #2ea043;
-  --yellow: #d29922;
-  --red: #f85149;
-  --blue: #58a6ff;
+  /* Charging Champions brand palette */
+  --brand-cyan: #00baff;   /* Pantone 306C  */
+  --brand-blue: #1179ee;   /* Pantone 2727C */
+  --brand-teal: #33becc;   /* Pantone 3115C */
+
+  --bg: #060b14;           /* cool blue-black, biased toward the brand blues */
+  --panel: #0e1626;
+  --panel-2: #16233a;
+  --border: #22314e;
+  --text: #e8f2fb;
+  --muted: #8ba0bd;
+  --accent: var(--brand-cyan);
+  --accent-2: var(--brand-blue);
+  --green: #2ea043;        /* semantic: good  (kept — signals state, not brand) */
+  --yellow: #e0a92b;       /* semantic: caution */
+  --red: #ff4d5e;          /* semantic: critical / brownout */
+  --blue: var(--brand-blue); /* bus voltage trace */
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --display: "Chalet Comprime", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -18,7 +35,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--sans);
   font-size: 14px;
 }
 
@@ -26,17 +43,18 @@ body {
 .topbar {
   display: flex; justify-content: space-between; align-items: center;
   gap: 16px; padding: 14px 20px;
-  background: linear-gradient(180deg, #12161d, #0d1117);
+  background: linear-gradient(180deg, #0b1526, var(--bg));
   border-bottom: 1px solid var(--border); flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: 14px; }
-.team {
-  font-family: var(--mono); font-weight: 700; font-size: 26px;
-  color: #0d1117; background: var(--accent);
-  padding: 4px 12px; border-radius: 8px; letter-spacing: 1px;
+.logo { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; flex-shrink: 0; filter: drop-shadow(0 2px 8px rgba(0,186,255,0.35)); }
+.logo svg { width: 100%; height: 100%; }
+.brand-text h1 {
+  margin: 0; font-family: var(--display); font-size: 22px; font-weight: 800;
+  letter-spacing: 0.3px; text-wrap: balance;
 }
-.brand-text h1 { margin: 0; font-size: 18px; }
-.brand-text p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.brand-text p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.cc { color: var(--brand-teal); font-weight: 700; }
 .brand-text em { color: var(--accent); font-style: normal; }
 
 .toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -62,7 +80,7 @@ body {
   padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
 }
 .btn:hover { border-color: #3d4757; }
-.btn-primary { background: var(--accent); color: #221900; border-color: transparent; }
+.btn-primary { background: var(--accent); color: #04202b; border-color: transparent; }
 .btn-danger { background: #3a1416; color: #ffb3ae; border-color: #5a1f22; }
 .btn-danger:hover { background: #4d1a1d; }
 .btn-small { padding: 3px 9px; font-size: 11px; }
@@ -120,7 +138,7 @@ canvas#graph { width: 100%; display: block; background: #0b0f16; border-radius: 
 .drive-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .chip { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; cursor: pointer; }
 .chip:hover { border-color: #3d4757; color: var(--text); }
-.chip.active { background: var(--accent); color: #221900; border-color: transparent; }
+.chip.active { background: var(--accent); color: #04202b; border-color: transparent; }
 .chip-clear { margin-left: auto; }
 
 .subsystems { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
