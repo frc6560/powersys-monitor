@@ -117,6 +117,12 @@ canvas#graph { width: 100%; display: block; background: #0b0f16; border-radius: 
 .tile-value.shedding { color: var(--yellow); }
 
 /* ---------- Subsystem bars ---------- */
+.drive-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.chip { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; cursor: pointer; }
+.chip:hover { border-color: #3d4757; color: var(--text); }
+.chip.active { background: var(--accent); color: #221900; border-color: transparent; }
+.chip-clear { margin-left: auto; }
+
 .subsystems { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
 .sub-row { display: grid; grid-template-columns: 90px 1fr 64px; align-items: center; gap: 10px; }
 .sub-name { font-weight: 600; font-size: 13px; }

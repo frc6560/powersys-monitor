@@ -38,12 +38,14 @@ the simulated battery:
 
 ## What you can do
 
+- **Load chips** (in the Per-Subsystem Draw panel) — click a chip to drive that subsystem at a
+  sustained preset, and stack several to hold a custom overload. "Clear all" releases them.
 - **⚡ Worst-case test** (header) fires drivetrain + shooter + intake + climber at once
   (design doc §5) — the transient inrush sags the battery, usually trips a brownout, and drives
-  the whole dashboard. This is the main way to generate load.
-- Watch the **automatic load-shedder** engage during the burst: it drops the least-critical
-  subsystems' current limits first (turret → indexer → intake → shooter → climber) and **never
-  sheds the drivetrain**.
+  the whole dashboard.
+- Stack a few load chips past ~90 A and watch the **automatic load-shedder** engage and stay
+  engaged: it drops the least-critical subsystems' current limits first (turret → indexer →
+  intake → shooter → climber) and **never sheds the drivetrain**.
 - **Load-shedding** toggle (header) — turn it off and re-run the test to see the difference
   (more brownouts, higher sustained draw).
 - **Battery age** slider raises internal resistance, so the same draw sags harder — mirrors the

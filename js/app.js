@@ -24,7 +24,7 @@
     voltage: $('voltage-value'), minVoltage: $('min-voltage'), soc: $('soc'),
     current: $('current-value'), currentFill: $('current-fill'),
     brownouts: $('brownouts'), peakCurrent: $('peak-current'),
-    subsystems: $('subsystems'), alerts: $('alerts'),
+    subsystems: $('subsystems'), driveChips: $('drive-chips'), alerts: $('alerts'),
     graph: $('graph'),
     socFill: $('soc-fill'), socText: $('soc-text'), ocv: $('ocv-val'), r0: $('r0-val'),
     predv: $('predv-val'), measv: $('measv-val'),
@@ -58,6 +58,34 @@
     };
   }
 
+  // ---- Load chips: click to drive a subsystem at a sustained preset ----
+  // Levels chosen so stacking a few pushes total over the 90 A budget and makes
+  // the load-shedder engage (and stay engaged) so you can watch it work.
+  const DRIVE_PRESET = {
+    drivetrain: 0.6, climber: 1.0, shooter: 1.0, intake: 1.0, indexer: 1.0, turret: 1.0,
+  };
+  const chipEls = {};
+  for (const s of PM.SUBSYSTEMS) {
+    const chip = document.createElement('button');
+    chip.className = 'chip';
+    chip.textContent = s.label;
+    chip.addEventListener('click', () => {
+      const on = !chip.classList.contains('active');
+      chip.classList.toggle('active', on);
+      if (on && !running) btnStart.click();          // auto-start the match
+      sim.setDemand(s.key, on ? DRIVE_PRESET[s.key] : 0);
+    });
+    el.driveChips.appendChild(chip);
+    chipEls[s.key] = chip;
+  }
+  const clearChip = document.createElement('button');
+  clearChip.className = 'chip chip-clear';
+  clearChip.textContent = 'Clear all';
+  clearChip.addEventListener('click', () => {
+    for (const s of PM.SUBSYSTEMS) { sim.setDemand(s.key, 0); chipEls[s.key].classList.remove('active'); }
+  });
+  el.driveChips.appendChild(clearChip);
+
   // ---- Match clock / run state ----
   let running = false;
   let matchTimeMs = 0;
@@ -71,7 +99,7 @@
     sim.reset(); shedder.reset(); initModels();
     matchTimeMs = 0; running = false;
     btnStart.textContent = 'Start'; btnStart.classList.add('btn-primary');
-    for (const s of PM.SUBSYSTEMS) sim.setDemand(s.key, 0);
+    for (const s of PM.SUBSYSTEMS) { sim.setDemand(s.key, 0); chipEls[s.key].classList.remove('active'); }
     logRows.length = 0; history.length = 0; matchHistory.length = 0;
     peakCurrent = 0; scrubIndex = null;
     el.alerts.innerHTML = '<li class="empty">No alerts.</li>';
