@@ -1,0 +1,8 @@
+# Netlify build config.
+#
+# Publishes ONLY the web dashboard (index.html + css/ + js/) by copying those
+# into dist/. The robot/ Java project and docs/ are intentionally left out so
+# they never end up on the public Netlify URL.
+[build]
+  command = "mkdir -p dist && cp index.html dist/ && cp -R css js dist/"
+  publish = "dist"
