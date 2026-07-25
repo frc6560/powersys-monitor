@@ -2,8 +2,12 @@
    (Charging Champions members' Macs), otherwise fall back gracefully. */
 @font-face {
   font-family: "Chalet Comprime";
-  src: local("Chalet Comprime Eighty"), local("ChaletComprime-Eighty"),
-       local("Chalet Comprime Cologne Eighty"), local("Chalet Comprime");
+  /* Renders on machines that have Chalet Comprimé installed. Covers the common
+     House Industries naming (with/without accent, several style names). */
+  src: local("Chalet Comprimé Cologne Eighty"), local("Chalet Comprime Cologne Eighty"),
+       local("ChaletComprime-CologneEighty"), local("Chalet Comprimé Eighty"),
+       local("Chalet Comprime Eighty"), local("ChaletComprime-Eighty"),
+       local("Chalet Comprimé"), local("Chalet Comprime"), local("ChaletComprime");
   font-display: swap;
 }
 
