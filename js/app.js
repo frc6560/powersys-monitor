@@ -257,7 +257,7 @@
     const span = timeSpanMs();
 
     // gridlines + current axis labels
-    tlCtx.fillStyle = '#5f6b7a'; tlCtx.font = '10px ui-monospace, monospace';
+    tlCtx.fillStyle = '#5f6b7a'; tlCtx.font = '10px -apple-system, "SF Pro Text", system-ui, sans-serif';
     tlCtx.strokeStyle = 'rgba(255,255,255,0.05)'; tlCtx.lineWidth = 1;
     [0, 60, 120, 180, 240].forEach((a) => {
       const y = h - (a / TL_MAX_A) * h;
