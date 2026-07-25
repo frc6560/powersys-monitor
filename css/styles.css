@@ -39,6 +39,12 @@ body {
 .brand-text p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
 .brand-text em { color: var(--accent); font-style: normal; }
 
+.toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.toolbar .switch-label, .toolbar .slider-label { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.toolbar .switch-label input { width: 15px; height: 15px; accent-color: var(--green); }
+.toolbar .slider-label input[type=range] { width: 90px; accent-color: var(--accent); }
+.toolbar .mono { color: var(--text); }
+
 .match { display: flex; align-items: center; gap: 16px; }
 .clock { font-family: var(--mono); font-size: 30px; font-weight: 700; min-width: 92px; text-align: center; }
 .match-controls { display: flex; gap: 8px; }

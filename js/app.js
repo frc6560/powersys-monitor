@@ -24,7 +24,7 @@
     voltage: $('voltage-value'), minVoltage: $('min-voltage'), soc: $('soc'),
     current: $('current-value'), currentFill: $('current-fill'),
     brownouts: $('brownouts'), peakCurrent: $('peak-current'),
-    subsystems: $('subsystems'), alerts: $('alerts'), controls: $('controls'),
+    subsystems: $('subsystems'), alerts: $('alerts'),
     graph: $('graph'),
     socFill: $('soc-fill'), socText: $('soc-text'), ocv: $('ocv-val'), r0: $('r0-val'),
     predv: $('predv-val'), measv: $('measv-val'),
@@ -41,7 +41,7 @@
     climber: '#c9518a', indexer: '#8b5cf6', turret: '#e07a3f',
   };
 
-  // ---- Build per-subsystem bars + controls ----
+  // ---- Build per-subsystem bars ----
   const subEls = {};
   for (const s of PM.SUBSYSTEMS) {
     const row = document.createElement('div');
@@ -56,21 +56,6 @@
       row, fill: row.querySelector('.sub-bar-fill'),
       tick: row.querySelector('.limit-tick'), amps: row.querySelector('.sub-amps'),
     };
-
-    const ctrl = document.createElement('div');
-    ctrl.className = 'ctrl';
-    ctrl.innerHTML =
-      `<label>${s.label} <b id="demand-${s.key}">0%</b></label>` +
-      `<input type="range" min="0" max="100" value="0" id="ctrl-${s.key}" />`;
-    el.controls.appendChild(ctrl);
-    const slider = ctrl.querySelector('input');
-    const readout = ctrl.querySelector('b');
-    slider.addEventListener('input', () => {
-      sim.setDemand(s.key, slider.value / 100);
-      readout.textContent = slider.value + '%';
-    });
-    subEls[s.key].slider = slider;
-    subEls[s.key].readout = readout;
   }
 
   // ---- Match clock / run state ----
@@ -86,11 +71,7 @@
     sim.reset(); shedder.reset(); initModels();
     matchTimeMs = 0; running = false;
     btnStart.textContent = 'Start'; btnStart.classList.add('btn-primary');
-    for (const s of PM.SUBSYSTEMS) {
-      sim.setDemand(s.key, 0);
-      subEls[s.key].slider.value = 0;
-      subEls[s.key].readout.textContent = '0%';
-    }
+    for (const s of PM.SUBSYSTEMS) sim.setDemand(s.key, 0);
     logRows.length = 0; history.length = 0; matchHistory.length = 0;
     peakCurrent = 0; scrubIndex = null;
     el.alerts.innerHTML = '<li class="empty">No alerts.</li>';
@@ -100,17 +81,9 @@
   $('btn-stress').addEventListener('click', () => {
     if (!running) btnStart.click();
     const burst = { drivetrain: 0.95, shooter: 1.0, intake: 0.9, climber: 1.0 };
-    for (const k in burst) {
-      sim.setDemand(k, burst[k]);
-      subEls[k].slider.value = burst[k] * 100;
-      subEls[k].readout.textContent = Math.round(burst[k] * 100) + '%';
-    }
+    for (const k in burst) sim.setDemand(k, burst[k]);
     setTimeout(() => {
-      for (const k in burst) {
-        sim.setDemand(k, 0);
-        subEls[k].slider.value = 0;
-        subEls[k].readout.textContent = '0%';
-      }
+      for (const k in burst) sim.setDemand(k, 0);
     }, 1800);
   });
 

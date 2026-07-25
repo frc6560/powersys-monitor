@@ -15,6 +15,19 @@
         <p>Live PDH draw · brownout guard · priority load-shedding — <em>simulation demo</em></p>
       </div>
     </div>
+    <div class="toolbar">
+      <button class="btn btn-danger btn-small" id="btn-stress">⚡ Worst-case test</button>
+      <label class="switch-label">
+        <input type="checkbox" id="toggle-shed" checked />
+        <span>Load-shedding</span>
+      </label>
+      <label class="slider-label">
+        Battery age
+        <input type="range" id="battery-age" min="0" max="100" value="30" />
+        <span id="battery-age-val" class="mono">0.30</span>
+      </label>
+      <button class="btn btn-small" id="btn-export">Export CSV</button>
+    </div>
     <div class="match">
       <div class="clock" id="clock">0:00</div>
       <div class="match-controls">
@@ -128,24 +141,6 @@
       <ul class="alerts" id="alerts"></ul>
     </section>
 
-    <!-- Controls -->
-    <section class="panel span-12">
-      <div class="panel-head"><h2>Driver Controls</h2><span class="hint">drag to demand current from each subsystem</span></div>
-      <div class="controls" id="controls"></div>
-      <div class="control-row">
-        <button class="btn btn-danger" id="btn-stress">⚡ Worst-case test (drive + shoot + intake + climb)</button>
-        <label class="switch-label">
-          <input type="checkbox" id="toggle-shed" checked />
-          <span>Automatic load-shedding</span>
-        </label>
-        <label class="slider-label">
-          Battery age
-          <input type="range" id="battery-age" min="0" max="100" value="30" />
-          <span id="battery-age-val" class="mono">0.30</span>
-        </label>
-        <button class="btn" id="btn-export">Export match log (CSV)</button>
-      </div>
-    </section>
   </main>
 
   <footer class="footer">

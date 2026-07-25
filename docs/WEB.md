@@ -38,14 +38,14 @@ the simulated battery:
 
 ## What you can do
 
-- **Drag the subsystem sliders** to demand current from each subsystem and watch the bus sag.
-- **⚡ Worst-case test** fires drivetrain + shooter + intake + climber at once (design doc §5) —
-  the transient inrush sags the battery and usually trips a brownout.
-- **Hold a sustained overload** (push several sliders high and leave them) to watch the
-  **automatic load-shedder** engage: it drops the least-critical subsystems' current limits
-  first (turret → indexer → intake → shooter → climber) and **never sheds the drivetrain**.
-- **Automatic load-shedding** toggle — turn it off and re-run the overload to see the
-  difference (more brownouts, higher sustained draw).
+- **⚡ Worst-case test** (header) fires drivetrain + shooter + intake + climber at once
+  (design doc §5) — the transient inrush sags the battery, usually trips a brownout, and drives
+  the whole dashboard. This is the main way to generate load.
+- Watch the **automatic load-shedder** engage during the burst: it drops the least-critical
+  subsystems' current limits first (turret → indexer → intake → shooter → climber) and **never
+  sheds the drivetrain**.
+- **Load-shedding** toggle (header) — turn it off and re-run the test to see the difference
+  (more brownouts, higher sustained draw).
 - **Battery age** slider raises internal resistance, so the same draw sags harder — mirrors the
   §6 idea of correlating battery age with voltage sag.
 - **Export match log (CSV)** downloads the recorded log (time, bus V, total A, per-subsystem A,
