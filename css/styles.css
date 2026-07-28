@@ -34,7 +34,7 @@
   --red: #ff4d5e;
   --blue: var(--brand-blue); /* bus voltage trace */
   /* Brand type: Chalet Comprime Eighty for display/H1; SF Pro Display for the rest. */
-  --display: "Chalet Comprime", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+  --display: "Chalet Comprime", "Charging Display", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
 }
 
@@ -59,8 +59,8 @@ body {
 .logo { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; flex-shrink: 0; filter: drop-shadow(0 2px 8px rgba(0,186,255,0.35)); }
 .logo svg { width: 100%; height: 100%; }
 .brand-text h1 {
-  margin: 0; font-family: var(--display); font-size: 22px; font-weight: 800;
-  letter-spacing: 0.3px; text-wrap: balance;
+  margin: 0; font-family: var(--display); font-size: 26px; font-weight: 700;
+  letter-spacing: 0.4px; text-wrap: balance; line-height: 1.05;
 }
 .brand-text p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
 .cc { color: var(--brand-teal); font-weight: 700; }
