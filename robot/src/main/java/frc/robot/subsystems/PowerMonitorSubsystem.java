@@ -85,6 +85,11 @@ public class PowerMonitorSubsystem extends SubsystemBase {
       new DoubleLogEntry(log, "/power/finance/driveAllocationA");
   private final DoubleLogEntry[] logSubsystemCurrent;
 
+  // ---- Raw all-channel view (diagnostic: map PDH ports by seeing which one spikes) ----
+  private static final int PDH_CHANNELS = 24; // REV PDH has channels 0-23
+  private final DoublePublisher[] rawChannelPub = new DoublePublisher[PDH_CHANNELS];
+  private final DoubleLogEntry[] rawChannelLog = new DoubleLogEntry[PDH_CHANNELS];
+
   // ---- Brownout tracking ----
   private int brownoutEventCount = 0;
   private boolean wasBrownedOut = false;
@@ -131,6 +136,31 @@ public class PowerMonitorSubsystem extends SubsystemBase {
         () -> statusFor(busVoltage(), totalCurrent()),
         () -> loadShedder.isShedding() ? loadShedder.shedStatus() : "nominal",
         subsystemCurrentSuppliers);
+
+    // Raw per-channel view. A "PDH Channels" tab shows all 24 ports as live bars, so you can
+    // map which physical PDH port feeds each mechanism by driving it and watching which one
+    // spikes — no wire tracing needed. Also mirrored to NT (PowerMonitor/raw/*) and DataLog.
+    var rawTab = edu.wpi.first.wpilibj.shuffleboard.Shuffleboard.getTab("PDH Channels");
+    for (int ch = 0; ch < PDH_CHANNELS; ch++) {
+      final int channel = ch;
+      String key = String.format("ch%02d", ch);
+      rawChannelPub[ch] = table.getDoubleTopic("raw/" + key).publish();
+      rawChannelLog[ch] = new DoubleLogEntry(log, "/power/raw/" + key);
+      rawTab.addDouble(key, () -> pdh.getCurrent(channel))
+          .withWidget(edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets.kNumberBar)
+          .withPosition((ch % 6) * 2, ch / 6)
+          .withSize(2, 1)
+          .withProperties(java.util.Map.of("Min", 0, "Max", 40));
+    }
+  }
+
+  /** Publish + log every PDH channel's raw current (diagnostic port-mapping view). */
+  private void publishRawChannels() {
+    for (int ch = 0; ch < PDH_CHANNELS; ch++) {
+      double c = pdh.getCurrent(ch);
+      rawChannelPub[ch].set(c);
+      rawChannelLog[ch].append(c);
+    }
   }
 
   /**
@@ -148,6 +178,7 @@ public class PowerMonitorSubsystem extends SubsystemBase {
     final double totalCurrent = pdh.getTotalCurrent();
     final double totalEnergy = pdh.getTotalEnergy();
 
+    publishRawChannels();
     updateBrownoutTracking(busVoltage);
     publishAndLogAggregate(busVoltage, totalCurrent, totalEnergy);
     publishAndLogPerSubsystem(now);
