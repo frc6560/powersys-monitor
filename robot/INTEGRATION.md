@@ -1,30 +1,37 @@
 # Integrating the power monitor into the real robot (motor-current / 6328 style)
 
 Reads per-subsystem current **from the motor controllers by CAN ID** — no PDH port mapping. Reuses
-`BatteryEstimator`, `BreakerThermalModel`, `FinanceDepartment`, and `MotorCurrentMonitor` (all in
+`BatteryEstimator`, `BreakerThermalModel`, `FinanceDepartment`, and `MotorCurrentMonitor` (in
 `frc/robot/power/`).
 
-> Targeted at the real `frc.robot` robot: **Swerve + Shooter + Hood + Turret + Intake + Feeder**.
-> CAN IDs below are read from your `Constants.java`; swerve IDs come from your YAGSL config.
+**Every motor on this robot is a Kraken / TalonFX** (confirmed from the `...IOTalonFX` layers on
+`glendale-working-branch`), so it's fully uniform — `getSupplyCurrent()` everywhere. Two CAN buses:
+**swerve is on a CANivore named `"Canivore"`**, everything else is on `"rio"`.
+
+## Full CAN map (from the repo — nothing left to confirm)
+| Subsystem | Motors | CAN IDs | Bus |
+| --- | --- | --- | --- |
+| Swerve Drive | KrakenX60 ×4 | 1 (FR), 4 (FL), 7 (BL), 10 (BR) | `Canivore` |
+| Swerve Steer | KrakenX44 ×4 | 3 (FR), 6 (FL), 9 (BL), 12 (BR) | `Canivore` |
+| Shooter | TalonFX ×2 | 19, 20 | `rio` |
+| Feeder | TalonFX ×3 | 14 (pan), 15 (floor), 23 (pusher) | `rio` |
+| Intake | TalonFX ×2 | 24, 25 | `rio` |
+| Hood | TalonFX ×1 | 21 | `rio` |
+| Turret | TalonFX ×1 | 17 | `rio` |
+
+*(CANcoders 2/5/8/11, 18, 22 aren't motors — skipped.)*
 
 ## 1. Copy the code in
-Copy into your robot project, fixing the `package` line to match (your robot uses `frc.robot`, so
-`frc.robot.power` is natural):
-
+Copy into your robot project (package `frc.robot`, so `frc.robot.power` fits):
 ```
-power/BatteryEstimator.java
-power/BreakerThermalModel.java
-power/FinanceDepartment.java
-power/MotorCurrentMonitor.java
+power/BatteryEstimator.java  power/BreakerThermalModel.java
+power/FinanceDepartment.java  power/MotorCurrentMonitor.java
 ```
+You already have Phoenix 6 — no new vendordeps.
 
-You already have **Phoenix 6** (and YAGSL). No new vendordeps needed. `MotorCurrentMonitor` is
-vendor-agnostic (takes `DoubleSupplier`s of amps); the Phoenix calls live in `RobotContainer`.
-
-## 2. Register your subsystems in RobotContainer
-Because nearly every mechanism is a **Kraken/TalonFX**, and Phoenix 6 allows multiple `TalonFX`
-objects per device, you can make **read-only handles by CAN ID** — no need to touch your existing
-subsystem objects. Drop this in:
+## 2. Register in RobotContainer
+Because every motor is a TalonFX (and Phoenix 6 allows multiple handles per device), just make
+read-only handles by CAN ID — no need to touch your `...IOTalonFX` subsystems:
 
 ```java
 import com.ctre.phoenix6.hardware.TalonFX;
@@ -33,77 +40,62 @@ import frc.robot.Constants.*;
 
 private final MotorCurrentMonitor powerMonitor = new MotorCurrentMonitor();
 
-/** Read-only supply-current source for a TalonFX by CAN ID (safe to duplicate the device). */
-private static DoubleSupplier talon(int canId) {
-  TalonFX fx = new TalonFX(canId);
+/** Read-only supply-current source for a TalonFX by CAN ID on a given bus. */
+private static DoubleSupplier talon(int canId, String canbus) {
+  TalonFX fx = new TalonFX(canId, canbus);
   var sig = fx.getSupplyCurrent();
-  sig.setUpdateFrequency(50);                 // default is 4 Hz — bump it for live monitoring
+  sig.setUpdateFrequency(50);                 // default 4 Hz — bump for live monitoring
   return () -> sig.refresh().getValueAsDouble();
 }
 
 private void configurePowerMonitor() {
-  // --- Swerve DRIVE — protected (shed last). CONFIRM CAN IDs from your YAGSL swervedrive JSON ---
+  final String CANIVORE = "Canivore";   // swerve bus
+  final String RIO = "rio";             // mechanism bus
+
+  // Swerve DRIVE (KrakenX60) — protected: shed last, gets the finance allocation
   powerMonitor.driveGroup("Swerve Drive", 160.0)
-      .addMotor(talon(/* FL drive */ 1))
-      .addMotor(talon(/* FR drive */ 2))
-      .addMotor(talon(/* BL drive */ 3))
-      .addMotor(talon(/* BR drive */ 4));
+      .addMotor(talon(1, CANIVORE)).addMotor(talon(4, CANIVORE))
+      .addMotor(talon(7, CANIVORE)).addMotor(talon(10, CANIVORE));
 
-  // --- Shooter flywheels (Kraken x60), CAN 19, 20 ---
+  // Swerve STEER (KrakenX44)
+  powerMonitor.group("Swerve Steer", 100.0)
+      .addMotor(talon(3, CANIVORE)).addMotor(talon(6, CANIVORE))
+      .addMotor(talon(9, CANIVORE)).addMotor(talon(12, CANIVORE));
+
   powerMonitor.group("Shooter", 100.0)
-      .addMotor(talon(ShooterConstants.LEFT_FLYWHEEL_ID))    // 19
-      .addMotor(talon(ShooterConstants.RIGHT_FLYWHEEL_ID));  // 20
+      .addMotor(talon(ShooterConstants.LEFT_FLYWHEEL_ID, RIO))   // 19
+      .addMotor(talon(ShooterConstants.RIGHT_FLYWHEEL_ID, RIO)); // 20
 
-  // --- Feeder (pan / floor / pusher), CAN 14, 15, 23 ---
   powerMonitor.group("Feeder", 120.0)
-      .addMotor(talon(FeederConstants.PAN_MOTOR_ID))         // 14
-      .addMotor(talon(FeederConstants.FLOOR_ID))             // 15
-      .addMotor(talon(FeederConstants.PUSHER_MOTOR_ID));     // 23
+      .addMotor(talon(FeederConstants.PAN_MOTOR_ID, RIO))        // 14
+      .addMotor(talon(FeederConstants.FLOOR_ID, RIO))           // 15
+      .addMotor(talon(FeederConstants.PUSHER_MOTOR_ID, RIO));    // 23
 
-  // --- Intake, CAN 24, 25 ---
   powerMonitor.group("Intake", 60.0)
-      .addMotor(talon(IntakeConstants.LEFT_MOTOR_ID))        // 24
-      .addMotor(talon(IntakeConstants.RIGHT_MOTOR_ID));      // 25
+      .addMotor(talon(IntakeConstants.LEFT_MOTOR_ID, RIO))       // 24
+      .addMotor(talon(IntakeConstants.RIGHT_MOTOR_ID, RIO));     // 25
 
-  // --- Hood (TalonFX), CAN 21 ---
   powerMonitor.group("Hood", 40.0)
-      .addMotor(talon(HoodConstants.HOOD_MOTOR_ID));         // 21
+      .addMotor(talon(HoodConstants.HOOD_MOTOR_ID, RIO));        // 21
 
-  // --- Turret, CAN 17  (confirm it's a TalonFX; if SPARK MAX see note below) ---
   powerMonitor.group("Turret", 30.0)
-      .addMotor(talon(TurretConstants.MOTOR_ID));            // 17
+      .addMotor(talon(TurretConstants.MOTOR_ID, RIO));           // 17
 }
 ```
-
-Call `configurePowerMonitor()` from your `RobotContainer` constructor. The command scheduler runs
+Call `configurePowerMonitor()` from your `RobotContainer` constructor. The scheduler runs
 `MotorCurrentMonitor.periodic()` automatically.
 
-### If a motor is a SPARK MAX (not TalonFX)
-Don't duplicate a `SparkMax` object. Use the **existing** one and its `getOutputCurrent()`:
-```java
-powerMonitor.group("Turret", 30.0).addMotor(() -> turret.motor().getOutputCurrent());
-```
-(Same for swerve **steer** motors if yours are SPARK MAX — register the drive Krakens with `talon(...)`
-and the steer motors via their existing objects.)
-
 ## 3. Use the outputs
-- NetworkTables: `PowerMonitor/motor/<name>`, plus a **"Power (motors)"** Shuffleboard tab; DataLog
-  under `/power/motor/<name>`. Bus voltage + brownout come from the roboRIO (`PowerMonitor/BusVoltage`,
+- NetworkTables `PowerMonitor/motor/<name>`, a **"Power (motors)"** Shuffleboard tab, and DataLog
+  `/power/motor/<name>`. Bus voltage + brownout from the roboRIO (`PowerMonitor/BusVoltage`,
   `BrownoutCount`).
-- For the **finance dept.** to act, have the drivetrain read `powerMonitor.driveCurrentAllocation()`
-  each loop and push it to the drive Krakens' stator-current limit. `setFinanceEnabled(false)` disables it.
+- For the finance dept. to act, feed `powerMonitor.driveCurrentAllocation()` into the swerve drive
+  Krakens' stator-current limit each loop. `setFinanceEnabled(false)` disables it.
 
-## What I still need from you
-1. **Swerve drive CAN IDs** (and whether steer is Kraken or SPARK MAX) — from your YAGSL
-   `deploy/swerve/.../modules/*.json`. Send them (or the folder) and I'll fill in the swerve block.
-2. **Confirm Turret (CAN 17)** is a TalonFX (vs SPARK MAX) — that's the only mechanism whose type I'm
-   inferring.
-
-Everything else (Shooter 19/20, Feeder 14/15/23, Intake 24/25, Hood 21) is pulled straight from your
-`Constants.java` and ready.
-
-## Note vs. the PDH path
-This measures **motor supply current** — captures the mechanisms, not non-motor loads (radio, RIO,
-pneumatics, LEDs), and won't exactly equal the PDH total. Ideal for per-subsystem attribution +
-brownout prediction. For full-system truth, also keep a `PowerDistribution` and read
-`getTotalCurrent()`/`getVoltage()` (no mapping needed).
+## Notes
+- The group capacities (160/100/… A) are for the dashboard bar scale + near-limit warnings — tune to
+  taste; they don't affect the readings.
+- This measures **motor supply current**: captures the mechanisms, not non-motor loads (radio, RIO,
+  pneumatics, LEDs), so the sum won't exactly equal the PDH total. Perfect for per-subsystem
+  attribution + brownout prediction. For full-system truth, also keep a `PowerDistribution` and read
+  `getTotalCurrent()` / `getVoltage()` (no mapping needed).
