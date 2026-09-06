@@ -1,12 +1,15 @@
 # Integrating the power monitor into the real robot (motor-current / 6328 style)
 
-This wires the monitor to read per-subsystem current **from the motor controllers by CAN ID** —
-no PDH port mapping, no wire tracing. It reuses `BatteryEstimator`, `BreakerThermalModel`,
-`FinanceDepartment`, and the new `MotorCurrentMonitor` (all in `frc/robot/power/`).
+Reads per-subsystem current **from the motor controllers by CAN ID** — no PDH port mapping. Reuses
+`BatteryEstimator`, `BreakerThermalModel`, `FinanceDepartment`, and `MotorCurrentMonitor` (all in
+`frc/robot/power/`).
+
+> Targeted at the real `frc.robot` robot: **Swerve + Shooter + Hood + Turret + Intake + Feeder**.
+> CAN IDs below are read from your `Constants.java`; swerve IDs come from your YAGSL config.
 
 ## 1. Copy the code in
-Copy these into your robot project (`com.team6560.frc2026`), fixing the `package` line to match
-wherever you put them (e.g. `com.team6560.frc2026.power`):
+Copy into your robot project, fixing the `package` line to match (your robot uses `frc.robot`, so
+`frc.robot.power` is natural):
 
 ```
 power/BatteryEstimator.java
@@ -15,95 +18,92 @@ power/FinanceDepartment.java
 power/MotorCurrentMonitor.java
 ```
 
-You already have the **Phoenix 6** and **REVLib** vendordeps, so no new dependencies are needed.
-`MotorCurrentMonitor` itself is vendor-agnostic (it only takes `DoubleSupplier`s of amps) — the
-Phoenix/REV calls live in your `RobotContainer` below.
+You already have **Phoenix 6** (and YAGSL). No new vendordeps needed. `MotorCurrentMonitor` is
+vendor-agnostic (takes `DoubleSupplier`s of amps); the Phoenix calls live in `RobotContainer`.
 
 ## 2. Register your subsystems in RobotContainer
-The pattern: one `group(...)` per subsystem, then `.addMotor(() -> <amps>)` per motor.
-
-- **Kraken / TalonFX** (Phoenix 6): `motor.getSupplyCurrent().getValueAsDouble()`
-- **SPARK MAX** (REVLib): `motor.getOutputCurrent()`
+Because nearly every mechanism is a **Kraken/TalonFX**, and Phoenix 6 allows multiple `TalonFX`
+objects per device, you can make **read-only handles by CAN ID** — no need to touch your existing
+subsystem objects. Drop this in:
 
 ```java
+import com.ctre.phoenix6.hardware.TalonFX;
+import java.util.function.DoubleSupplier;
+import frc.robot.Constants.*;
+
 private final MotorCurrentMonitor powerMonitor = new MotorCurrentMonitor();
 
+/** Read-only supply-current source for a TalonFX by CAN ID (safe to duplicate the device). */
+private static DoubleSupplier talon(int canId) {
+  TalonFX fx = new TalonFX(canId);
+  var sig = fx.getSupplyCurrent();
+  sig.setUpdateFrequency(50);                 // default is 4 Hz — bump it for live monitoring
+  return () -> sig.refresh().getValueAsDouble();
+}
+
 private void configurePowerMonitor() {
-  // --- Swerve DRIVE — Kraken/TalonFX, CAN 1, 4, 7, 10 (protected: shed last) ---
-  powerMonitor.driveGroup("Swerve Drive", 160.0)   // ~4 x 40A group capacity
-      .addMotor(() -> flDrive.getSupplyCurrent().getValueAsDouble())
-      .addMotor(() -> frDrive.getSupplyCurrent().getValueAsDouble())
-      .addMotor(() -> blDrive.getSupplyCurrent().getValueAsDouble())
-      .addMotor(() -> brDrive.getSupplyCurrent().getValueAsDouble());
+  // --- Swerve DRIVE — protected (shed last). CONFIRM CAN IDs from your YAGSL swervedrive JSON ---
+  powerMonitor.driveGroup("Swerve Drive", 160.0)
+      .addMotor(talon(/* FL drive */ 1))
+      .addMotor(talon(/* FR drive */ 2))
+      .addMotor(talon(/* BL drive */ 3))
+      .addMotor(talon(/* BR drive */ 4));
 
-  // --- Swerve STEER — SPARK MAX, CAN 2, 5, 8, 11 ---
-  powerMonitor.group("Swerve Steer", 120.0)
-      .addMotor(() -> flSteer.getOutputCurrent())
-      .addMotor(() -> frSteer.getOutputCurrent())
-      .addMotor(() -> blSteer.getOutputCurrent())
-      .addMotor(() -> brSteer.getOutputCurrent());
+  // --- Shooter flywheels (Kraken x60), CAN 19, 20 ---
+  powerMonitor.group("Shooter", 100.0)
+      .addMotor(talon(ShooterConstants.LEFT_FLYWHEEL_ID))    // 19
+      .addMotor(talon(ShooterConstants.RIGHT_FLYWHEEL_ID));  // 20
 
-  // --- Elevator — CAN 14, 15  (confirm motor type; using getOutputCurrent for SPARK MAX) ---
-  powerMonitor.group("Elevator", 80.0)
-      .addMotor(() -> elevatorLeft.getOutputCurrent())
-      .addMotor(() -> elevatorRight.getOutputCurrent());
+  // --- Feeder (pan / floor / pusher), CAN 14, 15, 23 ---
+  powerMonitor.group("Feeder", 120.0)
+      .addMotor(talon(FeederConstants.PAN_MOTOR_ID))         // 14
+      .addMotor(talon(FeederConstants.FLOOR_ID))             // 15
+      .addMotor(talon(FeederConstants.PUSHER_MOTOR_ID));     // 23
 
-  // --- Wrist — CAN 16 ---
-  powerMonitor.group("Wrist", 40.0)
-      .addMotor(() -> wrist.getOutputCurrent());
+  // --- Intake, CAN 24, 25 ---
+  powerMonitor.group("Intake", 60.0)
+      .addMotor(talon(IntakeConstants.LEFT_MOTOR_ID))        // 24
+      .addMotor(talon(IntakeConstants.RIGHT_MOTOR_ID));      // 25
 
-  // --- Climb — CAN 20, 21 ---
-  powerMonitor.group("Climb", 80.0)
-      .addMotor(() -> climb1.getOutputCurrent())
-      .addMotor(() -> climb2.getOutputCurrent());
+  // --- Hood (TalonFX), CAN 21 ---
+  powerMonitor.group("Hood", 40.0)
+      .addMotor(talon(HoodConstants.HOOD_MOTOR_ID));         // 21
+
+  // --- Turret, CAN 17  (confirm it's a TalonFX; if SPARK MAX see note below) ---
+  powerMonitor.group("Turret", 30.0)
+      .addMotor(talon(TurretConstants.MOTOR_ID));            // 17
 }
 ```
 
-Call `configurePowerMonitor()` from your `RobotContainer` constructor, after the motor objects
-exist. That's it — the command scheduler runs `MotorCurrentMonitor.periodic()` automatically.
+Call `configurePowerMonitor()` from your `RobotContainer` constructor. The command scheduler runs
+`MotorCurrentMonitor.periodic()` automatically.
 
-## 3. Where do the motor objects come from?
-- **Elevator / Wrist / Climb**: use the `SparkMax` / `TalonFX` objects your subsystems already
-  create — expose a getter (e.g. `elevator.leftMotor()`), or move the registration into each
-  subsystem.
-- **Swerve (YAGSL)**: your drive/steer motors live inside the YAGSL `SwerveDrive`. Two options:
-  1. If your YAGSL version exposes the raw controllers, read them via
-     `swerveDrive.getModules()[i]...`.
-  2. **Simplest for the Krakens:** because Phoenix 6 allows multiple `TalonFX` objects for the
-     same device, just make read-only handles by CAN ID and register those:
-     ```java
-     TalonFX flDrive = new TalonFX(1);   // read-only monitor handle, safe to duplicate
-     TalonFX frDrive = new TalonFX(4);
-     TalonFX blDrive = new TalonFX(7);
-     TalonFX brDrive = new TalonFX(10);
-     ```
-     (Do **not** do this for the SPARK MAX steer motors — don't duplicate a `SparkMax` object;
-     use the existing one and its `getOutputCurrent()`.)
+### If a motor is a SPARK MAX (not TalonFX)
+Don't duplicate a `SparkMax` object. Use the **existing** one and its `getOutputCurrent()`:
+```java
+powerMonitor.group("Turret", 30.0).addMotor(() -> turret.motor().getOutputCurrent());
+```
+(Same for swerve **steer** motors if yours are SPARK MAX — register the drive Krakens with `talon(...)`
+and the steer motors via their existing objects.)
 
-## 4. Use the outputs
-- Live data publishes to NetworkTables under `PowerMonitor/motor/<name>`, plus a **"Power
-  (motors)"** Shuffleboard tab, and logs to `/power/motor/<name>` in the DataLog.
-- For the **finance department** to actually help, have your drivetrain read
-  `powerMonitor.driveCurrentAllocation()` each loop and push it to the Kraken stator-current
-  limit. `powerMonitor.setFinanceEnabled(false)` disables dynamic allocation.
+## 3. Use the outputs
+- NetworkTables: `PowerMonitor/motor/<name>`, plus a **"Power (motors)"** Shuffleboard tab; DataLog
+  under `/power/motor/<name>`. Bus voltage + brownout come from the roboRIO (`PowerMonitor/BusVoltage`,
+  `BrownoutCount`).
+- For the **finance dept.** to act, have the drivetrain read `powerMonitor.driveCurrentAllocation()`
+  each loop and push it to the drive Krakens' stator-current limit. `setFinanceEnabled(false)` disables it.
 
-## Confirm before you trust the numbers
-> **CAN IDs** below are read from your repo (swerve JSONs + `Constants.java`). Confirm them, and
-> confirm the **motor type** for elevator / wrist / climb so the current call is right
-> (`getSupplyCurrent()` for Kraken, `getOutputCurrent()` for SPARK MAX):
+## What I still need from you
+1. **Swerve drive CAN IDs** (and whether steer is Kraken or SPARK MAX) — from your YAGSL
+   `deploy/swerve/.../modules/*.json`. Send them (or the folder) and I'll fill in the swerve block.
+2. **Confirm Turret (CAN 17)** is a TalonFX (vs SPARK MAX) — that's the only mechanism whose type I'm
+   inferring.
 
-| Subsystem | CAN IDs | Assumed type | Current call |
-| --- | --- | --- | --- |
-| Swerve Drive | 1, 4, 7, 10 | KrakenX60 | `getSupplyCurrent().getValueAsDouble()` |
-| Swerve Steer | 2, 5, 8, 11 | SPARK MAX | `getOutputCurrent()` |
-| Elevator | 14, 15 | **confirm** | — |
-| Wrist | 16 | **confirm** | — |
-| Climb | 20, 21 | **confirm** | — |
-
-Send me the confirmed CAN IDs + motor types and I'll finalize the snippet exactly for your motors.
+Everything else (Shooter 19/20, Feeder 14/15/23, Intake 24/25, Hood 21) is pulled straight from your
+`Constants.java` and ready.
 
 ## Note vs. the PDH path
-This measures **motor supply current**, so it captures the mechanisms but not non-motor loads
-(radio, RIO, pneumatics, LEDs), and the sum won't exactly equal the PDH total. If you also want
-the full-system total, keep a `PowerDistribution` object and read `getTotalCurrent()` /
-`getVoltage()` alongside — that needs no channel mapping.
+This measures **motor supply current** — captures the mechanisms, not non-motor loads (radio, RIO,
+pneumatics, LEDs), and won't exactly equal the PDH total. Ideal for per-subsystem attribution +
+brownout prediction. For full-system truth, also keep a `PowerDistribution` and read
+`getTotalCurrent()`/`getVoltage()` (no mapping needed).
