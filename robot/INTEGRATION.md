@@ -95,7 +95,8 @@ Call `configurePowerMonitor()` from your `RobotContainer` constructor. The sched
 ## Notes
 - The group capacities (160/100/… A) are for the dashboard bar scale + near-limit warnings — tune to
   taste; they don't affect the readings.
-- This measures **motor supply current**: captures the mechanisms, not non-motor loads (radio, RIO,
-  pneumatics, LEDs), so the sum won't exactly equal the PDH total. Perfect for per-subsystem
-  attribution + brownout prediction. For full-system truth, also keep a `PowerDistribution` and read
-  `getTotalCurrent()` / `getVoltage()` (no mapping needed).
+- **Per-subsystem** numbers come from **motor supply current** (mechanisms only). **Full-system
+  truth** is built in: the monitor also opens the REV PDH at `Constants.PDH_CAN_ID` and publishes
+  `PowerMonitor/PdhTotalCurrent` + uses PDH bus voltage for the estimator (falling back to the
+  roboRIO if no PDH is present). So you get both — per-subsystem motor draw *and* the true total
+  including non-motor loads — with no channel mapping.

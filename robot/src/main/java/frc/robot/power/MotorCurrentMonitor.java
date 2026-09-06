@@ -8,6 +8,7 @@ import edu.wpi.first.util.datalog.DataLog;
 import edu.wpi.first.util.datalog.DoubleLogEntry;
 import edu.wpi.first.wpilibj.DataLogManager;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
@@ -104,9 +105,15 @@ public class MotorCurrentMonitor extends SubsystemBase {
   private volatile double driveCurrentAllocation = PowerBudget.MAIN_BREAKER_AMPS;
   private boolean financeEnabled = true;
 
+  // Optional REV PDH for full-system truth (total current + bus voltage). Reading a PDH that
+  // isn't present just returns ~0, so we sanity-check its voltage and fall back to the roboRIO.
+  private final PowerDistribution pdh =
+      new PowerDistribution(Constants.PDH_CAN_ID, PowerDistribution.ModuleType.kRev);
+
   // NetworkTables + DataLog.
   private final NetworkTable table = NetworkTableInstance.getDefault().getTable("PowerMonitor");
   private final DoublePublisher totalCurrentPub = table.getDoubleTopic("MotorTotalCurrent").publish();
+  private final DoublePublisher pdhTotalPub = table.getDoubleTopic("PdhTotalCurrent").publish();
   private final DoublePublisher busVoltagePub = table.getDoubleTopic("BusVoltage").publish();
   private final DoublePublisher socPub = table.getDoubleTopic("estimator/SOC").publish();
   private final DoublePublisher thermalPub = table.getDoubleTopic("estimator/BreakerThermal").publish();
@@ -162,27 +169,33 @@ public class MotorCurrentMonitor extends SubsystemBase {
     final double now = Timer.getFPGATimestamp();
     final double dt = Constants.LOOP_PERIOD_SECONDS;
 
-    // 1) Sum each subsystem's motor currents; split drive vs. reserved (non-drive).
-    double total = 0;
-    double reservedNonDrive = 0;
+    // 1) Sum each subsystem's motor currents; track the protected drive group separately.
+    double motorTotal = 0;
+    double driveCurrent = 0;
     for (Group g : groups) {
       double c = g.sum();
-      total += c;
-      if (!g.isDrive) reservedNonDrive += c;
+      motorTotal += c;
+      if (g.isDrive) driveCurrent += c;
     }
 
-    // 2) Bus voltage + brownout straight from the roboRIO — no PDH needed.
-    final double voltage = RobotController.getBatteryVoltage();
+    // 2) Prefer the PDH for full-system total + bus voltage (captures non-motor loads too);
+    //    fall back to the roboRIO if no PDH is present (its reads sanity-check to ~0V).
+    final double pdhVoltage = pdh.getVoltage();
+    final boolean pdhOk = pdhVoltage > 4.0;
+    final double pdhTotal = pdh.getTotalCurrent();
+    final double voltage = pdhOk ? pdhVoltage : RobotController.getBatteryVoltage();
+    final double total = pdhOk ? pdhTotal : motorTotal; // system total for estimation
+    final double reservedNonDrive = Math.max(0.0, total - driveCurrent);
     updateBrownout(voltage);
 
-    // 3) Estimate + allocate.
+    // 3) Estimate + allocate on the system total.
     battery.update(voltage, total, dt);
     breaker.update(total, dt);
     if (financeEnabled) {
       driveCurrentAllocation = finance.allocate(reservedNonDrive);
     }
 
-    publishAndLog(total, voltage);
+    publishAndLog(motorTotal, pdhTotal, voltage);
     runAlerts(now, voltage, total);
     statusPub.set(statusFor(voltage, total));
   }
@@ -198,15 +211,16 @@ public class MotorCurrentMonitor extends SubsystemBase {
     wasBrownedOut = browned;
   }
 
-  private void publishAndLog(double total, double voltage) {
-    totalCurrentPub.set(total);
+  private void publishAndLog(double motorTotal, double pdhTotal, double voltage) {
+    totalCurrentPub.set(motorTotal);
+    pdhTotalPub.set(pdhTotal);
     busVoltagePub.set(voltage);
     socPub.set(battery.soc());
     thermalPub.set(breaker.thermalState());
     permissiblePub.set(finance.permissibleTotalCurrent());
     driveAllocPub.set(driveCurrentAllocation);
 
-    logTotal.append(total);
+    logTotal.append(motorTotal);
     logVoltage.append(voltage);
     logSoc.append(battery.soc());
     for (int i = 0; i < groups.size(); i++) {
