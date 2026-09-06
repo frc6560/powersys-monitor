@@ -15,8 +15,8 @@ import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.Constants;
-import frc.robot.Constants.PowerBudget;
+
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -100,15 +100,15 @@ public class MotorCurrentMonitor extends SubsystemBase {
   // Estimation / allocation (reused, unchanged).
   private final BatteryEstimator battery = new BatteryEstimator(18.0, 1.0, 0.3);
   private final BreakerThermalModel breaker =
-      new BreakerThermalModel(PowerBudget.MAIN_BREAKER_AMPS, 40.0);
+      new BreakerThermalModel(PowerConstants.MAIN_BREAKER_AMPS, 40.0);
   private final FinanceDepartment finance = new FinanceDepartment(battery, breaker);
-  private volatile double driveCurrentAllocation = PowerBudget.MAIN_BREAKER_AMPS;
+  private volatile double driveCurrentAllocation = PowerConstants.MAIN_BREAKER_AMPS;
   private boolean financeEnabled = true;
 
   // Optional REV PDH for full-system truth (total current + bus voltage). Reading a PDH that
   // isn't present just returns ~0, so we sanity-check its voltage and fall back to the roboRIO.
   private final PowerDistribution pdh =
-      new PowerDistribution(Constants.PDH_CAN_ID, PowerDistribution.ModuleType.kRev);
+      new PowerDistribution(PowerConstants.PDH_CAN_ID, PowerDistribution.ModuleType.kRev);
 
   // NetworkTables + DataLog.
   private final NetworkTable table = NetworkTableInstance.getDefault().getTable("PowerMonitor");
@@ -133,7 +133,7 @@ public class MotorCurrentMonitor extends SubsystemBase {
   // Brownout + alert throttling.
   private int brownoutCount = 0;
   private boolean wasBrownedOut = false;
-  private double minVoltage = PowerBudget.NOMINAL_VOLTAGE;
+  private double minVoltage = PowerConstants.NOMINAL_VOLTAGE;
   private double lastLowVoltageWarn = -WARNING_THROTTLE_SECONDS;
   private double lastHighCurrentWarn = -WARNING_THROTTLE_SECONDS;
   private double lastBreakerWarn = -WARNING_THROTTLE_SECONDS;
@@ -167,7 +167,7 @@ public class MotorCurrentMonitor extends SubsystemBase {
   @Override
   public void periodic() {
     final double now = Timer.getFPGATimestamp();
-    final double dt = Constants.LOOP_PERIOD_SECONDS;
+    final double dt = PowerConstants.LOOP_PERIOD_SECONDS;
 
     // 1) Sum each subsystem's motor currents; track the protected drive group separately.
     double motorTotal = 0;
@@ -231,11 +231,11 @@ public class MotorCurrentMonitor extends SubsystemBase {
   }
 
   private void runAlerts(double now, double voltage, double total) {
-    if (voltage < PowerBudget.LOW_VOLTAGE_WARNING && now - lastLowVoltageWarn > WARNING_THROTTLE_SECONDS) {
+    if (voltage < PowerConstants.LOW_VOLTAGE_WARNING && now - lastLowVoltageWarn > WARNING_THROTTLE_SECONDS) {
       DriverStation.reportWarning("Low bus voltage " + round(voltage) + "V - brownout risk", false);
       lastLowVoltageWarn = now;
     }
-    if (total > PowerBudget.TOTAL_CURRENT_BUDGET_AMPS && now - lastHighCurrentWarn > WARNING_THROTTLE_SECONDS) {
+    if (total > PowerConstants.TOTAL_CURRENT_BUDGET_AMPS && now - lastHighCurrentWarn > WARNING_THROTTLE_SECONDS) {
       DriverStation.reportWarning("Motor current " + round(total) + "A - approaching budget", false);
       lastHighCurrentWarn = now;
     }
@@ -250,8 +250,8 @@ public class MotorCurrentMonitor extends SubsystemBase {
   }
 
   private String statusFor(double voltage, double total) {
-    if (voltage < PowerBudget.LOW_VOLTAGE_WARNING || total > PowerBudget.TOTAL_CURRENT_BUDGET_AMPS) return "RED";
-    if (total > PowerBudget.TOTAL_CURRENT_CAUTION_AMPS) return "YELLOW";
+    if (voltage < PowerConstants.LOW_VOLTAGE_WARNING || total > PowerConstants.TOTAL_CURRENT_BUDGET_AMPS) return "RED";
+    if (total > PowerConstants.TOTAL_CURRENT_CAUTION_AMPS) return "YELLOW";
     return "GREEN";
   }
 
@@ -288,7 +288,7 @@ public class MotorCurrentMonitor extends SubsystemBase {
 
   public void setFinanceEnabled(boolean enabled) {
     financeEnabled = enabled;
-    if (!enabled) driveCurrentAllocation = PowerBudget.MAIN_BREAKER_AMPS;
+    if (!enabled) driveCurrentAllocation = PowerConstants.MAIN_BREAKER_AMPS;
   }
 
   public void setBatteryAge(double ageFactor) {

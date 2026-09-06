@@ -1,6 +1,6 @@
 package frc.robot.power;
 
-import frc.robot.Constants.PowerBudget;
+// self-contained thresholds
 
 /**
  * The "finance department" (Team 6328 term): allocates current to the drivetrain based on the
@@ -72,7 +72,7 @@ public class FinanceDepartment {
 
   private boolean feasible(double totalCurrent) {
     double minV = battery.projectMinVoltage(totalCurrent, batteryHorizon, projectionDt);
-    if (minV < PowerBudget.BROWNOUT_VOLTAGE + brownoutMargin) return false;
+    if (minV < PowerConstants.BROWNOUT_VOLTAGE + brownoutMargin) return false;
     double maxTheta = breaker.projectMaxTheta(totalCurrent, breakerHorizon, projectionDt);
     return maxTheta <= thetaMargin;
   }

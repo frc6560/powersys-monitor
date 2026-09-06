@@ -22,9 +22,11 @@ Reads per-subsystem current **from the motor controllers by CAN ID** — no PDH 
 *(CANcoders 2/5/8/11, 18, 22 aren't motors — skipped.)*
 
 ## 1. Copy the code in
-Copy into your robot project (package `frc.robot`, so `frc.robot.power` fits):
+Copy the whole `power/` package into your robot project (package `frc.robot`, so `frc.robot.power`
+fits) — it's **self-contained** (no dependency on your `Constants.java`; thresholds live in
+`PowerConstants`):
 ```
-power/BatteryEstimator.java  power/BreakerThermalModel.java
+power/PowerConstants.java     power/BatteryEstimator.java   power/BreakerThermalModel.java
 power/FinanceDepartment.java  power/MotorCurrentMonitor.java
 ```
 You already have Phoenix 6 — no new vendordeps.
