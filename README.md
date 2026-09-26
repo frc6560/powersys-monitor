@@ -23,6 +23,25 @@ Drag the subsystem sliders to demand current, hit **⚡ Worst-case test** to tri
 toggle **automatic load-shedding** and the **finance department**, and raise **battery age** to
 watch the dynamic current budget shrink. Full details in [`docs/WEB.md`](docs/WEB.md).
 
+## Live robot dashboard (`live.html`)
+
+`index.html` is a **simulation**. `live.html` is the **real** thing — it connects to the robot's
+**NetworkTables (NT4)** over WebSocket and shows the live `PowerMonitor/` data the on-robot
+`MotorCurrentMonitor` publishes (bus voltage, per-subsystem current by CAN ID, SOC, breaker
+thermal, finance allocation, timeline, breakdown pie). Read-only — it never commands the robot.
+
+**How to run it** (must be on the robot's Wi-Fi, and served over **http**, not the https link —
+browsers block an https page from opening the robot's `ws://`):
+
+```bash
+cd powersys-monitor
+python3 -m http.server 8100     # then open http://localhost:8100/live.html
+```
+
+Enter the roboRIO address (`10.65.60.2` on the radio, `172.22.11.2` over USB, or
+`roborio-6560-frc.local`) and press **Connect**. Deploy the `power-monitor` robot code first so the
+`PowerMonitor/` topics exist.
+
 ## Robot code
 
 The deployable project is in [`robot/`](robot/). Open that folder in **WPILib VS Code 2026**, then

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Charging Champions · 6560 — Live Power Monitor</title>
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-label="Charging Champions logo">
+        <svg viewBox="0 0 48 64" xmlns="http://www.w3.org/2000/svg">
+          <defs><linearGradient id="ccbolt" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#00baff"/><stop offset="1" stop-color="#1179ee"/>
+          </linearGradient></defs>
+          <path d="M30 2 L6 34 H19 L15 44 L42 20 H27 L34 2 Z" fill="none" stroke="#33becc" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round" opacity="0.55" transform="translate(-3 4)"/>
+          <path d="M30 2 L6 34 H19 L15 44 L42 20 H27 L34 2 Z" fill="url(#ccbolt)" stroke="url(#ccbolt)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1>Live Power Monitor</h1>
+        <p><span class="cc">Charging Champions</span> · Team 6560 · reading NetworkTables from the robot</p>
+      </div>
+    </div>
+    <div class="toolbar conn">
+      <label class="conn-field">roboRIO
+        <input type="text" id="nt-addr" value="10.65.60.2" spellcheck="false" />
+      </label>
+      <button class="btn btn-primary" id="nt-connect">Connect</button>
+      <span class="status-pill offline" id="conn-status">OFFLINE</span>
+    </div>
+  </header>
+
+  <div class="conn-hint" id="conn-hint">
+    Enter your roboRIO address and press Connect. Common values: <b>10.65.60.2</b> (radio),
+    <b>172.22.11.2</b> (USB), or <b>roborio-6560-frc.local</b>. You must be on the robot's network,
+    and this page must be served over <b>http</b> (localhost) — not the https link.
+  </div>
+
+  <main class="grid" id="dash" hidden>
+    <!-- Bus voltage -->
+    <section class="panel span-6">
+      <div class="panel-head"><h2>Bus Voltage</h2><span class="hint">brownout &lt; 6.8 V</span></div>
+      <div class="big-readout">
+        <span class="value" id="voltage-value">–</span><span class="unit">V</span>
+        <div class="sub"><span>min <b id="min-voltage">–</b> V</span><span>SoC <b id="soc">–</b>%</span></div>
+      </div>
+      <canvas id="graph" height="150"></canvas>
+      <div class="legend"><span class="lg lg-v">Bus voltage</span><span class="lg lg-a">Total current</span><span class="lg lg-budget">90 A budget</span></div>
+    </section>
+
+    <!-- Total current -->
+    <section class="panel span-6">
+      <div class="panel-head"><h2>Total Current</h2><span class="hint">PDH total · budget 90 A · breaker 120 A</span></div>
+      <div class="big-readout"><span class="value" id="current-value">–</span><span class="unit">A</span></div>
+      <div class="meter"><div class="meter-fill" id="current-fill"></div>
+        <div class="mark mark-caution" style="left:58.3%"><span>70</span></div>
+        <div class="mark mark-budget" style="left:75%"><span>90</span></div>
+        <div class="mark mark-breaker" style="left:100%"><span>120</span></div>
+      </div>
+      <div class="tiles">
+        <div class="tile"><span class="tile-label">Brownouts</span><span class="tile-value bad" id="brownouts">0</span></div>
+        <div class="tile"><span class="tile-label">Peak Current</span><span class="tile-value" id="peak-current">– A</span></div>
+        <div class="tile"><span class="tile-label">Motor Total</span><span class="tile-value" id="motor-total">– A</span></div>
+      </div>
+    </section>
+
+    <!-- Estimator + finance -->
+    <section class="panel span-8">
+      <div class="panel-head"><h2>Battery Estimator &amp; Finance Department</h2><span class="hint">live from the robot</span></div>
+      <div class="est-grid est-grid-2">
+        <div class="est-block">
+          <div class="est-label">State of Charge</div>
+          <div class="gauge"><div class="gauge-fill" id="soc-fill"></div><span class="gauge-text" id="soc-text">–</span></div>
+        </div>
+        <div class="est-block">
+          <div class="est-label">Main Breaker Thermal <span class="hint">trip at 100%</span></div>
+          <div class="gauge"><div class="gauge-fill thermal" id="thermal-fill"></div><span class="gauge-text" id="thermal-text">–</span></div>
+          <div class="est-label" style="margin-top:14px">Finance Department</div>
+          <div class="est-row big"><span>Permissible total</span><b id="permissible-val" class="mono accent">– A</b></div>
+          <div class="est-row big"><span>→ Drive allocation</span><b id="drivealloc-val" class="mono accent">– A</b></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Timeline + pie -->
+    <section class="panel span-12">
+      <div class="panel-head"><h2>Timeline — Current &amp; Brownouts</h2><span class="hint">hover to inspect a moment</span></div>
+      <div class="timeline-wrap">
+        <div class="timeline-graph">
+          <canvas id="timeline" height="220"></canvas>
+          <div class="legend"><span class="lg lg-a">Total current</span><span class="lg lg-v">Bus voltage</span><span class="lg lg-budget">90 A budget</span><span class="lg lg-brown">brownout</span></div>
+        </div>
+        <div class="timeline-side">
+          <div class="scrub-readout"><span class="scrub-when" id="scrub-when">live</span><span class="scrub-total"><b id="scrub-total">–</b> A total</span></div>
+          <canvas id="breakdown-pie" width="180" height="180"></canvas>
+          <ul class="pie-legend" id="pie-legend"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Per-subsystem -->
+    <section class="panel span-12">
+      <div class="panel-head"><h2>Per-Subsystem Draw</h2><span class="hint">from motor supply current by CAN ID</span></div>
+      <div class="subsystems" id="subsystems"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span class="cc">Charging Champions</span> · FRC 6560 — live NetworkTables view of the on-robot power monitor.
+  </footer>
+
+  <script src="js/nt4.js"></script>
+  <script src="js/live-app.js"></script>
+</body>
+</html>
